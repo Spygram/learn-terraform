@@ -1,0 +1,70 @@
+name: "Terrafrom Deployment"
+
+on:
+  workflow_dispatch:
+    inputs:
+      # workspace:
+      #   description: 'target terraform workspace'
+      #   required: true
+      #   default: 'dev'
+      #   type: choice
+      #   options:
+      #     - dev
+      #     - prod
+      terraform_action:
+        description: 'select action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+
+jobs:
+  terraform:
+    # name: "terraform workspace run"
+    name: "terraform manual run"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v6
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.6"
+      
+      - name: terraform init
+        run: terraform init
+
+      # - name: select or create workspace
+      #   run: |
+      #     terraform workspace select -or-create ${{ github.event.inputs.workspace }} 
+
+      - name: terraform format check
+        run: terraform fmt -check
+      
+      - name: terraform plan
+        if: ${{ github.event.inputs.terraform_action == 'plan' || github.event.inputs.terraform_action == 'apply' }}
+        # run: terraform plan -var-file="${{ github.event.inputs.workspace }}.tfvars" -no-color
+        run: terraform plan -no-color
+
+      - name: terraform action
+        if: ${{ github.event.inputs.terraform_action == 'apply' }}
+        # run: terraform apply -var-file="${{ github.event.inputs.workspace }}.tfvars" -auto-approve
+        run: terraform apply -auto-approve
+      - name: terraform destroy
+        if: ${{ github.event.inputs.terraform_action == 'destroy' }}
+        # run: terraform destroy -var-file="${{ github.event.inputs.workspace }}.tfvars" -auto-approve
+        run: terraform destroy -auto-approve
